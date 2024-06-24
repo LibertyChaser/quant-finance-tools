@@ -22,6 +22,6 @@ Quant Finance Tools is a collection of Python modules designed for quantitative 
 To install the Quant Finance Tools library, clone the repository and install the required dependencies:
 
 ```bash
-git clone https://github.com/yourusername/quant-finance-tools.git
+git clone https://github.com/LibertyChaser/quant-finance-tools.git
 cd quant-finance-tools
 pip install -r requirements.txt
