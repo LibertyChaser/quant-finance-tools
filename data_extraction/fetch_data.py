@@ -32,10 +32,23 @@ def fetch_daily_row_stock_data(ticker, last_n_years=5):
 
 
 def read_daily_row_stock_data(ticker):
-    # if not os.path.exists(daily_row_stock_data):
-    # init_daily_row_stock_data(ticker)
-    # if exists, update the data
-    pass
+    """
+    Read the daily stock data from the CSV file. If the file does not exist, initialize it.
+
+    Args:
+        ticker (str): Stock ticker symbol.
+
+    Returns:
+        DataFrame: Pandas DataFrame containing the stock data.
+    """
+    csv_file_path = os.path.join(daily_row_stock_path, f'{ticker}.csv')
+
+    if not os.path.exists(csv_file_path):
+        init_daily_row_stock_data(ticker)
+    else:
+        update_daily_row_stock_data(ticker)
+
+    return pd.read_csv(csv_file_path, index_col='date', parse_dates=True)
 
 
 def update_daily_row_stock_data(ticker):
@@ -47,13 +60,22 @@ def update_daily_row_stock_data(ticker):
 
 
 def init_daily_row_stock_data(ticker):
+    """
+    Initialize the stock data CSV file with historical data from Alpha Vantage.
+
+    Args:
+        ticker (str): Stock ticker symbol.
+    """
     daily_adjusted_data, meta_data = ts.get_daily_adjusted(
         symbol=ticker, outputsize='full')
     daily_adjusted_data = daily_adjusted_data.rename(columns={"1. open": "open",
                                                               "2. high": "high",
                                                               "3. low": "low",
-                                                              "5. adjusted close": "close",
-                                                              "6. volume": "volume"})
+                                                              "4. close": "close",
+                                                              "5. adjusted close": "adjusted_close",
+                                                              "6. volume": "volume",
+                                                              "7. dividend amount": "dividend",
+                                                              "8. split coefficient": "split_coefficient"})
     csv_file_path = os.path.join(
         daily_row_stock_path, f'{ticker}.csv')
     daily_adjusted_data.to_csv(csv_file_path)
