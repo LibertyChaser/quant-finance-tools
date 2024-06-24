@@ -52,11 +52,34 @@ def read_daily_row_stock_data(ticker):
 
 
 def update_daily_row_stock_data(ticker):
-    # Check if the data is up to date
-    # if time is after 4:15 PM, check the last date is today,
-    # if time is before 4:15 PM, check the last date is yesterday
-    # if not, update the data
-    pass
+    """
+    Update the stock data CSV file with the latest data if it is outdated.
+
+    Args:
+        ticker (str): Stock ticker symbol.
+    """
+    csv_file_path = os.path.join(daily_row_stock_path, f'{ticker}.csv')
+    df = pd.read_csv(csv_file_path, index_col='date', parse_dates=True)
+
+    # Get the latest date in the existing data
+    last_date = df.index[0]
+
+    # Fetch new data from the API
+    new_data = get_daily_renamed_adjusted(ticker)
+    new_data.index = pd.to_datetime(new_data.index)
+
+    # Get the latest date in the new data
+    latest_new_date = new_data.index.max()
+
+    # If the latest date in new data is more recent than the last date in the existing data, append the new data
+    if latest_new_date > last_date:
+        # Filter new data to include only the rows that are more recent than the last date in the existing data
+        new_data_to_add = new_data.loc[:last_date + pd.Timedelta(days=1)]
+        # Concatenate the new data with the existing data
+        df = pd.concat([new_data_to_add, df])
+        # Save the updated dataframe back to the CSV file
+        df.to_csv(csv_file_path)
+        print(f"Data for {ticker} has been updated.")
 
 
 def init_daily_row_stock_data(ticker):
@@ -66,16 +89,30 @@ def init_daily_row_stock_data(ticker):
     Args:
         ticker (str): Stock ticker symbol.
     """
-    daily_adjusted_data, meta_data = ts.get_daily_adjusted(
-        symbol=ticker, outputsize='full')
-    daily_adjusted_data = daily_adjusted_data.rename(columns={"1. open": "open",
-                                                              "2. high": "high",
-                                                              "3. low": "low",
-                                                              "4. close": "close",
-                                                              "5. adjusted close": "adjusted_close",
-                                                              "6. volume": "volume",
-                                                              "7. dividend amount": "dividend",
-                                                              "8. split coefficient": "split_coefficient"})
+    daily_adjusted_data = get_daily_renamed_adjusted(ticker, outputsize='full')
     csv_file_path = os.path.join(
         daily_row_stock_path, f'{ticker}.csv')
     daily_adjusted_data.to_csv(csv_file_path)
+
+
+def get_daily_renamed_adjusted(ticker, outputsize='compact'):
+    """
+    Get the daily adjusted stock data for the given ticker.
+
+    Args:
+        ticker (str): Stock ticker symbol.
+
+    Returns:
+        DataFrame: Pandas DataFrame containing the daily adjusted stock data.
+    """
+    data, meta_data = ts.get_daily_adjusted(
+        symbol=ticker, outputsize=outputsize)
+    data = data.rename(columns={"1. open": "open",
+                                "2. high": "high",
+                                "3. low": "low",
+                                "4. close": "close",
+                                "5. adjusted close": "adjusted_close",
+                                "6. volume": "volume",
+                                "7. dividend amount": "dividend",
+                                "8. split coefficient": "split_coefficient"})
+    return data
