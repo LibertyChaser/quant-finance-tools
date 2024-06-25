@@ -153,7 +153,8 @@ class FundamentalDataLoader(DataLoader):
             df.to_csv(self.csv_file_path)
             print(f"Data for {ticker} has been updated.")
         else:
-            print(f"No new data available for {ticker} {time_period} {report_type}.")
+            print(
+                f"No new data available for {ticker} {time_period} {report_type}.")
 
 
 class StockDataLoader(DataLoader):
@@ -245,7 +246,7 @@ class DailyStockDataLoader(StockDataLoader):
             # Concatenate the new data with the existing data
             df = pd.concat([new_data_to_add, df])
             # Save the updated dataframe back to the CSV file
-            df.to_csv(self.csv_file_path, index=False)
+            df.to_csv(self.csv_file_path)
             print(f"Data for {ticker} has been updated.")
         else:
             print(f"No new data available for {ticker}.")
