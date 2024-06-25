@@ -164,6 +164,7 @@ class DailyStockDataLoader(StockDataLoader):
     def __init__(self):
         super().__init__()
         self.row_daily_stock_path = os.getenv("ROW_DAILY_STOCK_PATH")
+        self.csv_file_path = None
 
     def load_daily_row_stock_data(self, ticker, last_n_years=5):
         """
@@ -191,15 +192,29 @@ class DailyStockDataLoader(StockDataLoader):
         Returns:
             DataFrame: Pandas DataFrame containing the stock data.
         """
-        csv_file_path = os.path.join(
+        self.csv_file_path = os.path.join(
             self.row_daily_stock_path, f'{ticker}.csv')
 
-        if not os.path.exists(csv_file_path):
+        if not os.path.exists(self.csv_file_path):
             self.init_daily_row_stock_data(ticker)
         else:
             self.update_daily_row_stock_data(ticker)
 
-        return pd.read_csv(csv_file_path, index_col='date', parse_dates=True)
+        return pd.read_csv(self.csv_file_path, index_col='date', parse_dates=True)
+
+    def init_daily_row_stock_data(self, ticker):
+        """
+        Initialize the stock data CSV file with historical data from Alpha Vantage.
+
+        Args:
+            ticker (str): Stock ticker symbol.
+        """
+        daily_adjusted_data = self.get_daily_renamed_adjusted(
+            ticker, outputsize='full')
+        
+        daily_adjusted_data.to_csv(self.csv_file_path, index=True)
+        
+        print(f"Data saved to {self.csv_file_path}")
 
     def update_daily_row_stock_data(self, ticker):
         """
@@ -208,9 +223,8 @@ class DailyStockDataLoader(StockDataLoader):
         Args:
             ticker (str): Stock ticker symbol.
         """
-        csv_file_path = os.path.join(
-            self.row_daily_stock_path, f'{ticker}.csv')
-        df = pd.read_csv(csv_file_path, index_col='date', parse_dates=True)
+        df = pd.read_csv(self.csv_file_path,
+                         index_col='date', parse_dates=True)
 
         # Get the latest date in the existing data
         last_date = df.index.max()
@@ -229,22 +243,8 @@ class DailyStockDataLoader(StockDataLoader):
             # Concatenate the new data with the existing data
             df = pd.concat([new_data_to_add, df])
             # Save the updated dataframe back to the CSV file
-            df.to_csv(csv_file_path, index=False)
+            df.to_csv(self.csv_file_path, index=False)
             print(f"Data for {ticker} has been updated.")
-
-    def init_daily_row_stock_data(self, ticker):
-        """
-        Initialize the stock data CSV file with historical data from Alpha Vantage.
-
-        Args:
-            ticker (str): Stock ticker symbol.
-        """
-        daily_adjusted_data = self.get_daily_renamed_adjusted(
-            ticker, outputsize='full')
-        csv_file_path = os.path.join(
-            self.row_daily_stock_path, f'{ticker}.csv')
-        daily_adjusted_data.to_csv(csv_file_path, index=False)
-        print(f"Data saved to {self.csv_file_path}")
 
     def get_daily_renamed_adjusted(self, ticker, outputsize='compact'):
         """
