@@ -152,6 +152,8 @@ class FundamentalDataLoader(DataLoader):
             # Save the updated dataframe back to the CSV file
             df.to_csv(self.csv_file_path)
             print(f"Data for {ticker} has been updated.")
+        else:
+            print(f"No new data available for {ticker} {time_period} {report_type}.")
 
 
 class StockDataLoader(DataLoader):
@@ -211,9 +213,9 @@ class DailyStockDataLoader(StockDataLoader):
         """
         daily_adjusted_data = self.get_daily_renamed_adjusted(
             ticker, outputsize='full')
-        
+
         daily_adjusted_data.to_csv(self.csv_file_path, index=True)
-        
+
         print(f"Data saved to {self.csv_file_path}")
 
     def update_daily_row_stock_data(self, ticker):
@@ -245,6 +247,8 @@ class DailyStockDataLoader(StockDataLoader):
             # Save the updated dataframe back to the CSV file
             df.to_csv(self.csv_file_path, index=False)
             print(f"Data for {ticker} has been updated.")
+        else:
+            print(f"No new data available for {ticker}.")
 
     def get_daily_renamed_adjusted(self, ticker, outputsize='compact'):
         """
