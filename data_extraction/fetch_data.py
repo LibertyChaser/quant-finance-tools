@@ -110,7 +110,7 @@ class FundamentalDataLoader(DataLoader):
                 f"Invalid report type '{report_type}' or time period '{time_period}'")
 
         data.to_csv(self.csv_file_path, index=False)
-        # print(f"Data saved to {self.csv_file_path}")
+        print(f"Data saved to {self.csv_file_path}")
 
     def update_financial_reports(self, ticker, time_period, report_type):
         """
@@ -136,7 +136,7 @@ class FundamentalDataLoader(DataLoader):
         else:
             raise ValueError(
                 f"Invalid report type '{report_type}' or time period '{time_period}'")
-        
+
         new_data.set_index('fiscalDateEnding', inplace=True)
         new_data.index = pd.to_datetime(new_data.index)
 
@@ -244,7 +244,7 @@ class DailyStockDataLoader(StockDataLoader):
         csv_file_path = os.path.join(
             self.row_daily_stock_path, f'{ticker}.csv')
         daily_adjusted_data.to_csv(csv_file_path, index=False)
-        # print(f"Data saved to {csv_file_path}")
+        print(f"Data saved to {self.csv_file_path}")
 
     def get_daily_renamed_adjusted(self, ticker, outputsize='compact'):
         """
