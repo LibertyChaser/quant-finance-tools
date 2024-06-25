@@ -30,6 +30,8 @@ class FundamentalDataLoader(DataLoader):
         data, meta_data = self.fd.get_company_overview(symbol=ticker)
         data_df = pd.DataFrame.from_dict(data, orient='index')
         return data_df
+    
+    
 
 
 class StockDataLoader(DataLoader):
