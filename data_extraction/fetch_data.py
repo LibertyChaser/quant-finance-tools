@@ -5,13 +5,37 @@ import os
 from dotenv import load_dotenv
 
 
-class StockDataLoader:
+class DataLoader:
     def __init__(self):
         load_dotenv()
         self.premium_api_key = os.getenv("ALPHA_VANTAGE_KEY")
         self.now = pd.Timestamp.now()
-        self.ts = TimeSeries(key=self.premium_api_key, output_format='pandas')
+
+
+class FundamentalDataLoader(DataLoader):
+    def __init__(self):
+        super().__init__()
         self.fd = FundamentalData(self.premium_api_key)
+
+    def get_company_overview(self, ticker):
+        """
+        Get the company overview data for the given ticker.
+
+        Args:
+            ticker (str): Stock ticker symbol.
+
+        Returns:
+            dict: Dictionary containing the company overview data.
+        """
+        data, meta_data = self.fd.get_company_overview(symbol=ticker)
+        data_df = pd.DataFrame.from_dict(data, orient='index')
+        return data_df
+
+
+class StockDataLoader(DataLoader):
+    def __init__(self):
+        super().__init__()
+        self.ts = TimeSeries(key=self.premium_api_key, output_format='pandas')
 
 
 class DailyStockDataLoader(StockDataLoader):
