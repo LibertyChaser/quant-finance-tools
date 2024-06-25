@@ -16,6 +16,24 @@ class FundamentalDataLoader(DataLoader):
     def __init__(self):
         super().__init__()
         self.fd = FundamentalData(self.premium_api_key)
+        self.row_financial_reports_path = os.getenv(
+            "ROW_FINANCIAL_REPORTS_PATH")
+        self.csv_file_path = None
+        # Define a mapping of report types to their corresponding function calls
+        self.report_function_mapping = {
+            'income_statement': {
+                'annual': self.fd.get_income_statement_annual,
+                'quarterly': self.fd.get_income_statement_quarterly
+            },
+            'balance_sheet': {
+                'annual': self.fd.get_balance_sheet_annual,
+                'quarterly': self.fd.get_balance_sheet_quarterly
+            },
+            'cash_flow': {
+                'annual': self.fd.get_cash_flow_annual,
+                'quarterly': self.fd.get_cash_flow_quarterly
+            }
+        }
 
     def get_company_overview(self, ticker):
         """
@@ -30,8 +48,110 @@ class FundamentalDataLoader(DataLoader):
         data, meta_data = self.fd.get_company_overview(symbol=ticker)
         data_df = pd.DataFrame.from_dict(data, orient='index')
         return data_df
-    
-    
+
+    def load_financial_reports(self, ticker, time_period, report_type, past_years=5):
+        """
+        Load the financial reports for the given report type and time period.
+
+        Args:
+            report_type (str): Type of financial report to load.
+            time_period (str): Time period for the financial report.
+            past_years (int, optional): Number of years of historical data to retrieve. Defaults to 5.
+
+        Returns:
+            DataFrame: Pandas DataFrame containing the financial report data.
+        """
+        all_data = self.read_financial_reports(
+            ticker, time_period, report_type)
+        if time_period == 'annual':
+            df = pd.DataFrame(all_data.iloc[:past_years])
+        elif time_period == 'quarterly':
+            df = pd.DataFrame(all_data.iloc[:past_years * 4])
+        return df
+
+    def read_financial_reports(self, ticker, time_period, report_type):
+        """
+        Read the financial reports from the CSV file. If the file does not exist, initialize it.
+
+        Args:
+            ticker (str): Stock ticker symbol.
+            report_type (str): Type of financial report to load.
+            time_period (str): Time period for the financial report.
+
+        Returns:
+            DataFrame: Pandas DataFrame containing the financial report data.
+        """
+        self.csv_file_path = os.path.join(
+            self.row_financial_reports_path, f'{ticker}_{time_period}_{report_type}.csv')
+
+        if not os.path.exists(self.csv_file_path):
+            self.init_financial_reports(ticker, time_period, report_type)
+        else:
+            self.update_financial_reports(ticker, time_period, report_type)
+
+        return pd.read_csv(self.csv_file_path, index_col='fiscalDateEnding', parse_dates=True)
+
+    def init_financial_reports(self, ticker, time_period, report_type):
+        """
+        Initialize the financial reports CSV file with historical data from Alpha Vantage.
+
+        Args:
+            ticker (str): Stock ticker symbol.
+            report_type (str): Type of financial report to load.
+        """
+        # Fetch the data using the mapping
+        data_function = self.report_function_mapping.get(
+            report_type, {}).get(time_period)
+
+        if data_function:
+            data, _ = data_function(ticker)
+        else:
+            raise ValueError(
+                f"Invalid report type '{report_type}' or time period '{time_period}'")
+
+        data.to_csv(self.csv_file_path, index=False)
+        # print(f"Data saved to {self.csv_file_path}")
+
+    def update_financial_reports(self, ticker, time_period, report_type):
+        """
+        Update the financial reports CSV file with the latest data if it is outdated.
+
+        Args:
+            ticker (str): Stock ticker symbol.
+            report_type (str): Type of financial report to load.
+        """
+
+        df = pd.read_csv(self.csv_file_path,
+                         index_col='fiscalDateEnding', parse_dates=True)
+
+        # Get the latest date in the existing data
+        last_date = df.index.max()
+
+        # Fetch the data using the mapping
+        data_function = self.report_function_mapping.get(
+            report_type, {}).get(time_period)
+
+        if data_function:
+            new_data, _ = data_function(ticker)
+        else:
+            raise ValueError(
+                f"Invalid report type '{report_type}' or time period '{time_period}'")
+        
+        new_data.set_index('fiscalDateEnding', inplace=True)
+        new_data.index = pd.to_datetime(new_data.index)
+
+        # Get the latest date in the new data
+        latest_new_date = new_data.index.max()
+
+        # If the latest date in new data is more recent than the last date in the existing data, append the new data
+        if latest_new_date > last_date:
+            # Filter new data to include only the rows that are more recent than the last date in the existing data
+            new_data_to_add = new_data.loc[:last_date + pd.Timedelta(days=1)]
+            # Concatenate the new data with the existing data
+            df = pd.concat([new_data_to_add, df])
+            # Save the updated dataframe back to the CSV file
+            df.to_csv(self.csv_file_path)
+            print(f"Data for {ticker} has been updated.")
 
 
 class StockDataLoader(DataLoader):
@@ -43,7 +163,7 @@ class StockDataLoader(DataLoader):
 class DailyStockDataLoader(StockDataLoader):
     def __init__(self):
         super().__init__()
-        self.daily_row_stock_path = os.getenv("DAILY_ROW_STOCK_PATH")
+        self.row_daily_stock_path = os.getenv("ROW_DAILY_STOCK_PATH")
 
     def load_daily_row_stock_data(self, ticker, last_n_years=5):
         """
@@ -72,7 +192,7 @@ class DailyStockDataLoader(StockDataLoader):
             DataFrame: Pandas DataFrame containing the stock data.
         """
         csv_file_path = os.path.join(
-            self.daily_row_stock_path, f'{ticker}.csv')
+            self.row_daily_stock_path, f'{ticker}.csv')
 
         if not os.path.exists(csv_file_path):
             self.init_daily_row_stock_data(ticker)
@@ -89,7 +209,7 @@ class DailyStockDataLoader(StockDataLoader):
             ticker (str): Stock ticker symbol.
         """
         csv_file_path = os.path.join(
-            self.daily_row_stock_path, f'{ticker}.csv')
+            self.row_daily_stock_path, f'{ticker}.csv')
         df = pd.read_csv(csv_file_path, index_col='date', parse_dates=True)
 
         # Get the latest date in the existing data
@@ -109,7 +229,7 @@ class DailyStockDataLoader(StockDataLoader):
             # Concatenate the new data with the existing data
             df = pd.concat([new_data_to_add, df])
             # Save the updated dataframe back to the CSV file
-            df.to_csv(csv_file_path)
+            df.to_csv(csv_file_path, index=False)
             print(f"Data for {ticker} has been updated.")
 
     def init_daily_row_stock_data(self, ticker):
@@ -122,9 +242,9 @@ class DailyStockDataLoader(StockDataLoader):
         daily_adjusted_data = self.get_daily_renamed_adjusted(
             ticker, outputsize='full')
         csv_file_path = os.path.join(
-            self.daily_row_stock_path, f'{ticker}.csv')
-        daily_adjusted_data.to_csv(csv_file_path)
-        print(f"Data saved to {csv_file_path}")
+            self.row_daily_stock_path, f'{ticker}.csv')
+        daily_adjusted_data.to_csv(csv_file_path, index=False)
+        # print(f"Data saved to {csv_file_path}")
 
     def get_daily_renamed_adjusted(self, ticker, outputsize='compact'):
         """
@@ -152,4 +272,4 @@ class DailyStockDataLoader(StockDataLoader):
 class IntradayStockDataLoader(StockDataLoader):
     def __init__(self):
         super().__init__()
-        self.intraday_stock_path = os.getenv("INTRADAY_STOCK_PATH")
+        self.intraday_stock_path = os.getenv("ROW_INTRADAY_STOCK_PATH")
