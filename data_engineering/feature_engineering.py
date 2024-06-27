@@ -131,7 +131,7 @@ class FeatureEngineering:
         last_date = df.index.max()
 
         # Fetch new data from the API
-        new_data = self.loader.get_daily_renamed_adjusted(ticker)
+        new_data = self.loader.load_daily_row_stock_data(ticker, last_n_years=2)
         new_data.index = pd.to_datetime(new_data.index)
         
         new_data = self.process_commen_features(new_data)

@@ -3,13 +3,14 @@ from alpha_vantage.fundamentaldata import FundamentalData
 import pandas as pd
 import os
 from dotenv import load_dotenv
+import pandas_market_calendars as mcal
 
 
 class DataLoader:
     def __init__(self):
         load_dotenv()
         self.premium_api_key = os.getenv("ALPHA_VANTAGE_KEY")
-        self.now = pd.Timestamp.now()
+        self.now = pd.Timestamp.now(tz='America/New_York')
 
 
 class FundamentalDataLoader(DataLoader):
@@ -110,6 +111,7 @@ class FundamentalDataLoader(DataLoader):
                 f"Invalid report type '{report_type}' or time period '{time_period}'")
 
         data.to_csv(self.csv_file_path, index=False)
+
         print(f"Data saved to {self.csv_file_path}")
 
     def update_financial_reports(self, ticker, time_period, report_type):
@@ -182,7 +184,7 @@ class DailyStockDataLoader(StockDataLoader):
         """
         all_data = self.read_daily_row_stock_data(ticker)
         start_date = self.now - pd.DateOffset(years=last_n_years)
-        result = all_data.loc[:start_date]
+        result = all_data.loc[:start_date.tz_localize(None)]
         return result
 
     def read_daily_row_stock_data(self, ticker):
@@ -232,15 +234,20 @@ class DailyStockDataLoader(StockDataLoader):
         # Get the latest date in the existing data
         last_date = df.index.max()
 
-        # Fetch new data from the API
-        new_data = self.get_daily_renamed_adjusted(ticker)
-        new_data.index = pd.to_datetime(new_data.index)
+        nyse = mcal.get_calendar('NYSE')
+        market_date_gap = nyse.schedule(
+            start_date=last_date, end_date=self.now)
+        
+        if market_date_gap.shape[0] < 2 or (market_date_gap.shape[0] == 2 and self.now.time() < pd.Timestamp('16:30').time()):
+            print(f"No new data available for {ticker}.")
+        else:
+            # Fetch new data from the API
+            new_data = self.get_daily_renamed_adjusted(ticker)
+            new_data.index = pd.to_datetime(new_data.index)
 
-        # Get the latest date in the new data
-        latest_new_date = new_data.index.max()
-
-        # If the latest date in new data is more recent than the last date in the existing data, append the new data
-        if latest_new_date > last_date:
+            # Get the latest date in the new data
+            latest_new_date = new_data.index.max()
+            
             # Filter new data to include only the rows that are more recent than the last date in the existing data
             new_data_to_add = new_data.loc[:last_date + pd.Timedelta(days=1)]
             # Concatenate the new data with the existing data
@@ -248,8 +255,6 @@ class DailyStockDataLoader(StockDataLoader):
             # Save the updated dataframe back to the CSV file
             df.to_csv(self.csv_file_path)
             print(f"Data for {ticker} has been updated.")
-        else:
-            print(f"No new data available for {ticker}.")
 
     def get_daily_renamed_adjusted(self, ticker, outputsize='compact'):
         """
