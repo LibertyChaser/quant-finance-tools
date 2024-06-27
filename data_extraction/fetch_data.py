@@ -171,7 +171,7 @@ class DailyStockDataLoader(StockDataLoader):
         self.row_daily_stock_path = os.getenv("ROW_DAILY_STOCK_PATH")
         self.csv_file_path = None
 
-    def load_daily_row_stock_data(self, ticker, last_n_years=5):
+    def load_daily_row_stock_data(self, ticker, last_n_years=5, start_date=None, end_date=None):
         """
         Fetch historical stock data for the given ticker, limited to the last 'n' years.
 
@@ -183,8 +183,12 @@ class DailyStockDataLoader(StockDataLoader):
             DataFrame: Pandas DataFrame containing the historical stock data.
         """
         all_data = self.read_daily_row_stock_data(ticker)
-        start_date = self.now - pd.DateOffset(years=last_n_years)
-        result = all_data.loc[:start_date.tz_localize(None)]
+        if start_date == None:
+            start_date = self.now.tz_localize(
+                None) - pd.DateOffset(years=last_n_years)
+        if end_date == None:
+            end_date = self.now.tz_localize(None)
+        result = all_data.loc[end_date:start_date]
         return result
 
     def read_daily_row_stock_data(self, ticker):
@@ -237,7 +241,7 @@ class DailyStockDataLoader(StockDataLoader):
         nyse = mcal.get_calendar('NYSE')
         market_date_gap = nyse.schedule(
             start_date=last_date, end_date=self.now)
-        
+
         if market_date_gap.shape[0] < 2 or (market_date_gap.shape[0] == 2 and self.now.time() < pd.Timestamp('16:30').time()):
             print(f"No new data available for {ticker}.")
         else:
@@ -247,7 +251,7 @@ class DailyStockDataLoader(StockDataLoader):
 
             # Get the latest date in the new data
             latest_new_date = new_data.index.max()
-            
+
             # Filter new data to include only the rows that are more recent than the last date in the existing data
             new_data_to_add = new_data.loc[:last_date + pd.Timedelta(days=1)]
             # Concatenate the new data with the existing data
