@@ -222,8 +222,10 @@ class DailyStockDataLoader(StockDataLoader):
             ticker, outputsize='full')
 
         daily_adjusted_data.to_csv(self.csv_file_path, index=True)
-
+        
+        print("Current time: ", self.now)
         print(f"Data saved to {self.csv_file_path}")
+        print(f"Data Date Range: {daily_adjusted_data.index.min()} to {daily_adjusted_data.index.max()}")
 
     def update_daily_row_stock_data(self, ticker):
         """
@@ -236,12 +238,13 @@ class DailyStockDataLoader(StockDataLoader):
                          index_col='date', parse_dates=True)
 
         # Get the latest date in the existing data
-        last_date = df.index.max()
+        current_last_date = df.index.max()
 
         nyse = mcal.get_calendar('NYSE')
         market_date_gap = nyse.schedule(
-            start_date=last_date, end_date=self.now)
-
+            start_date=current_last_date, end_date=self.now)
+        
+        print("Current time: ", self.now)
         if market_date_gap.shape[0] < 2 or (market_date_gap.shape[0] == 2 and self.now.time() < pd.Timestamp('16:30').time()):
             print(f"No new data available for {ticker}.")
         else:
@@ -253,12 +256,14 @@ class DailyStockDataLoader(StockDataLoader):
             latest_new_date = new_data.index.max()
 
             # Filter new data to include only the rows that are more recent than the last date in the existing data
-            new_data_to_add = new_data.loc[:last_date + pd.Timedelta(days=1)]
+            new_data_to_add = new_data.loc[:current_last_date + pd.Timedelta(days=1)]
             # Concatenate the new data with the existing data
             df = pd.concat([new_data_to_add, df])
             # Save the updated dataframe back to the CSV file
             df.to_csv(self.csv_file_path)
+            
             print(f"Data for {ticker} has been updated.")
+            print(f"Updated Data Date Range: {new_data_to_add.index.min()} to {new_data_to_add.index.max()}")
 
     def get_daily_renamed_adjusted(self, ticker, outputsize='compact'):
         """
