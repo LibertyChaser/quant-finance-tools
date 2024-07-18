@@ -1,4 +1,4 @@
-from data_extraction.fetch_data import DailyStockDataLoader, FundamentalDataLoader
+from data_extraction.fetch_financial_data import DailyStockDataLoader, FundamentalDataLoader
 import pandas as pd
 import numpy as np
 import os
@@ -61,7 +61,7 @@ class FeatureEngineering:
 
     def process_commen_features(self, data):
 
-        data = data[::-1]
+        data = data[::-1].copy()
 
         data.loc[:, 'log_return'] = np.log(
             data['adjusted_close'] / data['adjusted_close'].shift(1))
@@ -73,53 +73,55 @@ class FeatureEngineering:
 
         data.loc[:, 'log_volume'] = np.log(data['volume'])
 
-        data['daily_returns'] = data['adjusted_close'].diff()
+        data.loc[:, 'daily_returns'] = data['adjusted_close'].diff()
 
-        data['MA-5'] = data['adjusted_close'].rolling(window=5).mean()
+        data.loc[:, 'MA-5'] = data['adjusted_close'].rolling(window=5).mean()
 
-        data['MA-30'] = data['adjusted_close'].rolling(window=30).mean()
+        data.loc[:, 'MA-30'] = data['adjusted_close'].rolling(window=30).mean()
 
         RSI = ta.momentum.RSIIndicator(data['adjusted_close'], window=14)
-        data['RSI'] = RSI.rsi()
+        data.loc[:, 'RSI'] = RSI.rsi()
 
-        data['5-day_variance'] = data['adjusted_close'].rolling(window=5).var()
+        data.loc[:,
+                 '5-day_variance'] = data['adjusted_close'].rolling(window=5).var()
 
         WILLR = ta.momentum.WilliamsRIndicator(high=data['high'],
                                                low=data['low'],
                                                close=data['adjusted_close'],
                                                lbp=14)
-        data['Williams_%R'] = WILLR.williams_r()
+        data.loc[:, 'Williams_%R'] = WILLR.williams_r()
 
-        data['z_score'] = (data['adjusted_close'] - data['adjusted_close'].rolling(window=10).mean()
-                           ) / data['adjusted_close'].rolling(window=10).std()
+        data.loc[:, 'z_score'] = (data['adjusted_close'] - data['adjusted_close'].rolling(window=10).mean()
+                                  ) / data['adjusted_close'].rolling(window=10).std()
 
-        data['SMA10'] = data['adjusted_close'].rolling(window=10).mean()
+        data.loc[:, 'SMA10'] = data['adjusted_close'].rolling(window=10).mean()
 
-        data['EMA12'] = data['adjusted_close'].ewm(
+        data.loc[:, 'EMA12'] = data['adjusted_close'].ewm(
             span=12, adjust=False).mean()
 
         MACD = ta.trend.MACD(
             close=data['adjusted_close'], window_fast=12, window_slow=26)
-        data['MACD'] = MACD.macd()
+        data.loc[:, 'MACD'] = MACD.macd()
 
         RoC = ta.momentum.ROCIndicator(close=data['adjusted_close'], window=1)
-        data['RoC'] = RoC.roc()
+        data.loc[:, 'RoC'] = RoC.roc()
 
         low_min = data['low'].rolling(window=15).min()
         high_max = data['high'].rolling(window=15).max()
-        data['K15'] = ((data['adjusted_close'] - low_min) /
-                       (high_max - low_min)) * 100
+        data.loc[:, 'K15'] = ((data['adjusted_close'] - low_min) /
+                              (high_max - low_min)) * 100
 
-        data['Bollinger_M'] = data['adjusted_close'].rolling(window=20).mean()
-        data['Bollinger_U'] = data['Bollinger_M'] + \
+        data.loc[:, 'Bollinger_M'] = data['adjusted_close'].rolling(
+            window=20).mean()
+        data.loc[:, 'Bollinger_U'] = data['Bollinger_M'] + \
             2 * data['adjusted_close'].rolling(window=20).std()
-        data['Bollinger_L'] = data['Bollinger_M'] - \
+        data.loc[:, 'Bollinger_L'] = data['Bollinger_M'] - \
             2 * data['adjusted_close'].rolling(window=20).std()
 
-        data['MOM12'] = data['adjusted_close'] - \
+        data.loc[:, 'MOM12'] = data['adjusted_close'] - \
             data['adjusted_close'].shift(12)
 
-        data = data[::-1]
+        data = data.iloc[::-1]
 
         return data
 
@@ -131,9 +133,10 @@ class FeatureEngineering:
         last_date = df.index.max()
 
         # Fetch new data from the API
-        new_data = self.loader.load_daily_row_stock_data(ticker, last_n_years=2)
+        new_data = self.loader.load_daily_row_stock_data(
+            ticker, last_n_years=2)
         new_data.index = pd.to_datetime(new_data.index)
-        
+
         new_data = self.process_commen_features(new_data)
 
         # Get the latest date in the new data
@@ -151,6 +154,3 @@ class FeatureEngineering:
         else:
             print(f"No new data available for {ticker}.")
 
-
-a = FeatureEngineering()
-a.load_commen_features('AAPL', 5)
