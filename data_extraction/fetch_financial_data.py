@@ -114,11 +114,11 @@ class FundamentalDataLoader(DataLoader):
             report_type (str): Type of financial report to load.
         """
 
-        df = pd.read_csv(self.gz_file_path,
+        curr_fin_report_df = pd.read_csv(self.gz_file_path,
                          index_col='fiscalDateEnding', parse_dates=True)
 
         # Get the latest date in the existing data
-        last_date = df.index.max()
+        last_date = curr_fin_report_df.index.max()
 
         # Fetch the data using the mapping
         data_function = self.report_function_mapping.get(
@@ -134,16 +134,16 @@ class FundamentalDataLoader(DataLoader):
         new_data.index = pd.to_datetime(new_data.index)
 
         # Get the latest date in the new data
-        latest_new_date = new_data.index.max()
+        new_date_last_date = new_data.index.max()
 
         # If the latest date in new data is more recent than the last date in the existing data, append the new data
-        if latest_new_date > last_date:
+        if new_date_last_date > last_date:
             # Filter new data to include only the rows that are more recent than the last date in the existing data
-            new_data_to_add = new_data.loc[:last_date + pd.Timedelta(days=1)]
+            new_data_to_add = new_data.loc[last_date:]
             # Concatenate the new data with the existing data
-            df = pd.concat([new_data_to_add, df])
+            curr_fin_report_df = pd.concat([new_data_to_add, curr_fin_report_df])
             # Save the updated dataframe back to the CSV file
-            df.to_csv(self.gz_file_path)
+            curr_fin_report_df.to_csv(self.gz_file_path, index=False, compression='gzip')
             print(f"Data for {ticker} has been updated.")
         else:
             print(
