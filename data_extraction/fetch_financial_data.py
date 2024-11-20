@@ -59,7 +59,8 @@ class FundamentalDataLoader(DataLoader):
         Args:
             report_type (str): Type of financial report to load.
             time_period (str): Time period for the financial report.
-            past_years (int, optional): Number of years of historical data to retrieve. Defaults to 5.
+            begin_date (str): Start date for the financial report data.
+            end_date (str): End date for the financial report data.
 
         Returns:
             DataFrame: Pandas DataFrame containing the financial report data.
@@ -170,47 +171,36 @@ class DailyStockDataLoader(StockDataLoader):
             "QFT_COMPRESSED_DAILY_STOCK_PATH")
         self.gz_file_path = None
 
-    def load_daily_row_stock_data(self, ticker, last_n_years=5, start_date=None, end_date=None):
+    def load_daily_stock_data(self, ticker, begin_date='2020-01-01', end_date='2021-01-01'):
         """
         Fetch historical stock data for the given ticker, limited to the last 'n' years.
 
         Args:
             ticker (str): Stock ticker symbol.
-            last_n_years (int): Number of years of historical data to retrieve.
+            begin_date (str): Start date for the historical stock data.
+            end_date (str): End date for the historical stock data.
 
         Returns:
             DataFrame: Pandas DataFrame containing the historical stock data.
         """
-        all_data = self.read_daily_row_stock_data(ticker)
-        if start_date == None:
-            start_date = self.now.tz_localize(
-                None) - pd.DateOffset(years=last_n_years)
-        if end_date == None:
-            end_date = self.now.tz_localize(None)
-        result = all_data.loc[end_date:start_date]
-        return result
-
-    def read_daily_row_stock_data(self, ticker):
-        """
-        Read the daily stock data from the CSV file. If the file does not exist, initialize it.
-
-        Args:
-            ticker (str): Stock ticker symbol.
-
-        Returns:
-            DataFrame: Pandas DataFrame containing the stock data.
-        """
+        
         self.gz_file_path = os.path.join(
-            self.compressed_daily_stock_path, f'{ticker}.csv')
+            self.compressed_daily_stock_path, f'{ticker}.gz')
 
         if not os.path.exists(self.gz_file_path):
-            self.init_daily_row_stock_data(ticker)
-        else:
-            self.update_daily_row_stock_data(ticker)
+            self.init_daily_stock_data(ticker)
 
-        return pd.read_csv(self.gz_file_path, index_col='date', parse_dates=True)
+        data = pd.read_csv(
+            self.gz_file_path, index_col='date', parse_dates=True)
+        last_date = data.index.max()
+        if end_date > last_date:
+            self.update_daily_stock_data(ticker)
+            data = pd.read_csv(
+                self.gz_file_path, index_col='date', parse_dates=True)
+        data = data.loc[begin_date:end_date].sort_index(ascending=False)
+        return data
 
-    def init_daily_row_stock_data(self, ticker):
+    def init_daily_stock_data(self, ticker):
         """
         Initialize the stock data CSV file with historical data from Alpha Vantage.
 
@@ -220,14 +210,14 @@ class DailyStockDataLoader(StockDataLoader):
         daily_adjusted_data = self.get_daily_renamed_adjusted(
             ticker, outputsize='full')
 
-        daily_adjusted_data.to_csv(self.gz_file_path, index=True)
+        daily_adjusted_data.to_csv(self.gz_file_path, index=True, compression='gzip')
 
         print("Current time: ", self.now)
         print(f"Data saved to {self.gz_file_path}")
         print(
             f"Data Date Range: {daily_adjusted_data.index.min()} to {daily_adjusted_data.index.max()}")
 
-    def update_daily_row_stock_data(self, ticker):
+    def update_daily_stock_data(self, ticker):
         """
         Update the stock data CSV file with the latest data if it is outdated.
 
@@ -261,7 +251,7 @@ class DailyStockDataLoader(StockDataLoader):
             # Concatenate the new data with the existing data
             df = pd.concat([new_data_to_add, df])
             # Save the updated dataframe back to the CSV file
-            df.to_csv(self.gz_file_path)
+            df.to_csv(self.gz_file_path, index=True, compression='gzip')
 
             print(f"Data for {ticker} has been updated.")
             print(
