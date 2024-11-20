@@ -1,3 +1,4 @@
+# TODO: Replace alpha_vantage
 from alpha_vantage.timeseries import TimeSeries
 from alpha_vantage.fundamentaldata import FundamentalData
 import pandas as pd
@@ -165,8 +166,9 @@ class StockDataLoader(DataLoader):
 class DailyStockDataLoader(StockDataLoader):
     def __init__(self):
         super().__init__()
-        self.row_daily_stock_path = os.getenv("ROW_DAILY_STOCK_PATH")
-        self.csv_file_path = None
+        self.compressed_daily_stock_path = os.getenv(
+            "QFT_COMPRESSED_DAILY_STOCK_PATH")
+        self.gz_file_path = None
 
     def load_daily_row_stock_data(self, ticker, last_n_years=5, start_date=None, end_date=None):
         """
@@ -198,15 +200,15 @@ class DailyStockDataLoader(StockDataLoader):
         Returns:
             DataFrame: Pandas DataFrame containing the stock data.
         """
-        self.csv_file_path = os.path.join(
-            self.row_daily_stock_path, f'{ticker}.csv')
+        self.gz_file_path = os.path.join(
+            self.compressed_daily_stock_path, f'{ticker}.csv')
 
-        if not os.path.exists(self.csv_file_path):
+        if not os.path.exists(self.gz_file_path):
             self.init_daily_row_stock_data(ticker)
         else:
             self.update_daily_row_stock_data(ticker)
 
-        return pd.read_csv(self.csv_file_path, index_col='date', parse_dates=True)
+        return pd.read_csv(self.gz_file_path, index_col='date', parse_dates=True)
 
     def init_daily_row_stock_data(self, ticker):
         """
@@ -218,10 +220,10 @@ class DailyStockDataLoader(StockDataLoader):
         daily_adjusted_data = self.get_daily_renamed_adjusted(
             ticker, outputsize='full')
 
-        daily_adjusted_data.to_csv(self.csv_file_path, index=True)
+        daily_adjusted_data.to_csv(self.gz_file_path, index=True)
 
         print("Current time: ", self.now)
-        print(f"Data saved to {self.csv_file_path}")
+        print(f"Data saved to {self.gz_file_path}")
         print(
             f"Data Date Range: {daily_adjusted_data.index.min()} to {daily_adjusted_data.index.max()}")
 
@@ -232,7 +234,7 @@ class DailyStockDataLoader(StockDataLoader):
         Args:
             ticker (str): Stock ticker symbol.
         """
-        df = pd.read_csv(self.csv_file_path,
+        df = pd.read_csv(self.gz_file_path,
                          index_col='date', parse_dates=True)
 
         # Get the latest date in the existing data
@@ -259,7 +261,7 @@ class DailyStockDataLoader(StockDataLoader):
             # Concatenate the new data with the existing data
             df = pd.concat([new_data_to_add, df])
             # Save the updated dataframe back to the CSV file
-            df.to_csv(self.csv_file_path)
+            df.to_csv(self.gz_file_path)
 
             print(f"Data for {ticker} has been updated.")
             print(
