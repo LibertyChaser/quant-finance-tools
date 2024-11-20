@@ -17,9 +17,9 @@ class FundamentalDataLoader(DataLoader):
     def __init__(self):
         super().__init__()
         self.fd = FundamentalData(self.premium_api_key)
-        self.row_financial_reports_path = os.getenv(
-            "ROW_FINANCIAL_REPORTS_PATH")
-        self.csv_file_path = None
+        self.compressed_financial_reports_path = os.getenv(
+            "QFT_COMPRESSED_FINANCIAL_REPORTS_PATH")
+        self.gz_file_path = None
         # Define a mapping of report types to their corresponding function calls
         self.report_function_mapping = {
             'income_statement': {
