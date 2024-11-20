@@ -66,13 +66,23 @@ class FundamentalDataLoader(DataLoader):
         self.gz_file_path = os.path.join(
             self.compressed_financial_reports_path, f'{ticker}_{time_period}_{report_type}.gz')
 
-        if not os.path.exists(self.csv_file_path):
+        if not os.path.exists(self.gz_file_path):
             self.init_financial_reports(ticker, time_period, report_type)
-        else:
+
+        fin_report = pd.read_csv(
+            self.gz_file_path, index_col='fiscalDateEnding', parse_dates=True)
+        
+        last_date = fin_report.index.max()
+        today_date = pd.Timestamp.now(tz='America/New_York')
+        date_diff = today_date - last_date
+        if (time_period == 'annual' and date_diff.days > 365) or (time_period == 'quarterly' and date_diff.days > 90):
             self.update_financial_reports(ticker, time_period, report_type)
+            print(f'Updated {ticker} {time_period} {report_type} data.')
+        
+        fin_report = fin_report.loc[end_date:begin_date]
 
-        return pd.read_csv(self.csv_file_path, index_col='fiscalDateEnding', parse_dates=True)
-
+        return fin_report
+    
     def init_financial_reports(self, ticker, time_period, report_type):
         """
         Initialize the financial reports CSV file with historical data from Alpha Vantage.
@@ -91,10 +101,10 @@ class FundamentalDataLoader(DataLoader):
             raise ValueError(
                 f"Invalid report type '{report_type}' or time period '{time_period}'")
 
-        data.to_csv(self.csv_file_path, index=False)
+        data.to_csv(self.gz_file_path, index=False, compression='gzip')
 
-        print(f"Data saved to {self.csv_file_path}")
-
+        print(f'Data saved to {self.gz_file_path}')
+        
     def update_financial_reports(self, ticker, time_period, report_type):
         """
         Update the financial reports CSV file with the latest data if it is outdated.
@@ -104,7 +114,7 @@ class FundamentalDataLoader(DataLoader):
             report_type (str): Type of financial report to load.
         """
 
-        df = pd.read_csv(self.csv_file_path,
+        df = pd.read_csv(self.gz_file_path,
                          index_col='fiscalDateEnding', parse_dates=True)
 
         # Get the latest date in the existing data
@@ -133,7 +143,7 @@ class FundamentalDataLoader(DataLoader):
             # Concatenate the new data with the existing data
             df = pd.concat([new_data_to_add, df])
             # Save the updated dataframe back to the CSV file
-            df.to_csv(self.csv_file_path)
+            df.to_csv(self.gz_file_path)
             print(f"Data for {ticker} has been updated.")
         else:
             print(
