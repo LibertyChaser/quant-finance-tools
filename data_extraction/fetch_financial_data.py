@@ -1,4 +1,4 @@
-# TODO: Replace alpha_vantage
+# TODO: Replace alpha_vantage with request url
 from alpha_vantage.timeseries import TimeSeries
 from alpha_vantage.fundamentaldata import FundamentalData
 import pandas as pd
@@ -192,12 +192,15 @@ class DailyStockDataLoader(StockDataLoader):
 
         data = pd.read_csv(
             self.gz_file_path, index_col='date', parse_dates=True)
+        
         last_date = data.index.max()
-        if end_date > last_date:
+        if pd.Timestamp(end_date) > last_date:
             self.update_daily_stock_data(ticker)
             data = pd.read_csv(
                 self.gz_file_path, index_col='date', parse_dates=True)
-        data = data.loc[begin_date:end_date].sort_index(ascending=False)
+            
+        data = data.sort_index().loc[begin_date:end_date].sort_index(
+            ascending=False)
         return data
 
     def init_daily_stock_data(self, ticker):
