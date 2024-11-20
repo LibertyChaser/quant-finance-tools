@@ -50,7 +50,7 @@ class FundamentalDataLoader(DataLoader):
         data_df = pd.DataFrame.from_dict(data, orient='index')
         return data_df
 
-    def load_financial_reports(self, ticker, time_period, report_type, past_years=5):
+    def load_financial_reports(self, ticker, time_period, report_type, begin_date='2020-01-01', end_date='2021-01-01'):
         """
         Load the financial reports for the given report type and time period.
 
@@ -62,28 +62,9 @@ class FundamentalDataLoader(DataLoader):
         Returns:
             DataFrame: Pandas DataFrame containing the financial report data.
         """
-        all_data = self.read_financial_reports(
-            ticker, time_period, report_type)
-        if time_period == 'annual':
-            df = pd.DataFrame(all_data.iloc[:past_years])
-        elif time_period == 'quarterly':
-            df = pd.DataFrame(all_data.iloc[:past_years * 4])
-        return df
 
-    def read_financial_reports(self, ticker, time_period, report_type):
-        """
-        Read the financial reports from the CSV file. If the file does not exist, initialize it.
-
-        Args:
-            ticker (str): Stock ticker symbol.
-            report_type (str): Type of financial report to load.
-            time_period (str): Time period for the financial report.
-
-        Returns:
-            DataFrame: Pandas DataFrame containing the financial report data.
-        """
-        self.csv_file_path = os.path.join(
-            self.row_financial_reports_path, f'{ticker}_{time_period}_{report_type}.csv')
+        self.gz_file_path = os.path.join(
+            self.compressed_financial_reports_path, f'{ticker}_{time_period}_{report_type}.gz')
 
         if not os.path.exists(self.csv_file_path):
             self.init_financial_reports(ticker, time_period, report_type)
