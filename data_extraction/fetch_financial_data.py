@@ -21,6 +21,7 @@ class FundamentalDataLoader(DataLoader):
             "QFT_COMPRESSED_FINANCIAL_REPORTS_PATH")
         self.gz_file_path = None
         # Define a mapping of report types to their corresponding function calls
+        
         self.report_function_mapping = {
             'income_statement': {
                 'annual': self.fd.get_income_statement_annual,
@@ -71,18 +72,21 @@ class FundamentalDataLoader(DataLoader):
 
         fin_report = pd.read_csv(
             self.gz_file_path, index_col='fiscalDateEnding', parse_dates=True)
-        
+
         last_date = fin_report.index.max()
         today_date = pd.Timestamp.now()
         date_diff = (today_date - last_date).days
         if (time_period == 'annual' and date_diff > 365) or (time_period == 'quarterly' and date_diff > 91):
             self.update_financial_reports(ticker, time_period, report_type)
-            print(f'Updated {ticker} {time_period} {report_type} data.')
-        
-        fin_report = fin_report.sort_index().loc[begin_date:end_date].sort_index(ascending=False)
+            # print(f'Updated {ticker} {time_period} {report_type} data.')
+            fin_report = pd.read_csv(
+                self.gz_file_path, index_col='fiscalDateEnding', parse_dates=True)
+
+        fin_report = fin_report.sort_index(
+        ).loc[begin_date:end_date].sort_index(ascending=False)
 
         return fin_report
-    
+
     def init_financial_reports(self, ticker, time_period, report_type):
         """
         Initialize the financial reports CSV file with historical data from Alpha Vantage.
@@ -104,7 +108,7 @@ class FundamentalDataLoader(DataLoader):
         data.to_csv(self.gz_file_path, index=False, compression='gzip')
 
         print(f'Data saved to {self.gz_file_path}')
-        
+
     def update_financial_reports(self, ticker, time_period, report_type):
         """
         Update the financial reports CSV file with the latest data if it is outdated.
@@ -115,7 +119,7 @@ class FundamentalDataLoader(DataLoader):
         """
 
         curr_fin_report_df = pd.read_csv(self.gz_file_path,
-                         index_col='fiscalDateEnding', parse_dates=True)
+                                         index_col='fiscalDateEnding', parse_dates=True)
 
         # Get the latest date in the existing data
         last_date = curr_fin_report_df.index.max()
@@ -141,9 +145,11 @@ class FundamentalDataLoader(DataLoader):
             # Filter new data to include only the rows that are more recent than the last date in the existing data
             new_data_to_add = new_data.loc[last_date:]
             # Concatenate the new data with the existing data
-            curr_fin_report_df = pd.concat([new_data_to_add, curr_fin_report_df])
+            curr_fin_report_df = pd.concat(
+                [new_data_to_add, curr_fin_report_df])
             # Save the updated dataframe back to the CSV file
-            curr_fin_report_df.to_csv(self.gz_file_path, index=False, compression='gzip')
+            curr_fin_report_df.to_csv(
+                self.gz_file_path, index=False, compression='gzip')
             print(f"Data for {ticker} has been updated.")
         else:
             print(
@@ -213,10 +219,11 @@ class DailyStockDataLoader(StockDataLoader):
             ticker, outputsize='full')
 
         daily_adjusted_data.to_csv(self.csv_file_path, index=True)
-        
+
         print("Current time: ", self.now)
         print(f"Data saved to {self.csv_file_path}")
-        print(f"Data Date Range: {daily_adjusted_data.index.min()} to {daily_adjusted_data.index.max()}")
+        print(
+            f"Data Date Range: {daily_adjusted_data.index.min()} to {daily_adjusted_data.index.max()}")
 
     def update_daily_row_stock_data(self, ticker):
         """
@@ -234,7 +241,7 @@ class DailyStockDataLoader(StockDataLoader):
         nyse = mcal.get_calendar('NYSE')
         market_date_gap = nyse.schedule(
             start_date=current_last_date, end_date=self.now)
-        
+
         print("Current time: ", self.now)
         if market_date_gap.shape[0] < 2 or (market_date_gap.shape[0] == 2 and self.now.time() < pd.Timestamp('16:30').time()):
             print(f"No new data available for {ticker}.")
@@ -247,14 +254,16 @@ class DailyStockDataLoader(StockDataLoader):
             latest_new_date = new_data.index.max()
 
             # Filter new data to include only the rows that are more recent than the last date in the existing data
-            new_data_to_add = new_data.loc[:current_last_date + pd.Timedelta(days=1)]
+            new_data_to_add = new_data.loc[:current_last_date +
+                                           pd.Timedelta(days=1)]
             # Concatenate the new data with the existing data
             df = pd.concat([new_data_to_add, df])
             # Save the updated dataframe back to the CSV file
             df.to_csv(self.csv_file_path)
-            
+
             print(f"Data for {ticker} has been updated.")
-            print(f"Updated Data Date Range: {new_data_to_add.index.min()} to {new_data_to_add.index.max()}")
+            print(
+                f"Updated Data Date Range: {new_data_to_add.index.min()} to {new_data_to_add.index.max()}")
 
     def get_daily_renamed_adjusted(self, ticker, outputsize='compact'):
         """
