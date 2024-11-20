@@ -73,13 +73,13 @@ class FundamentalDataLoader(DataLoader):
             self.gz_file_path, index_col='fiscalDateEnding', parse_dates=True)
         
         last_date = fin_report.index.max()
-        today_date = pd.Timestamp.now(tz='America/New_York')
-        date_diff = today_date - last_date
-        if (time_period == 'annual' and date_diff.days > 365) or (time_period == 'quarterly' and date_diff.days > 90):
+        today_date = pd.Timestamp.now()
+        date_diff = (today_date - last_date).days
+        if (time_period == 'annual' and date_diff > 365) or (time_period == 'quarterly' and date_diff > 91):
             self.update_financial_reports(ticker, time_period, report_type)
             print(f'Updated {ticker} {time_period} {report_type} data.')
         
-        fin_report = fin_report.loc[end_date:begin_date]
+        fin_report = fin_report.sort_index().loc[begin_date:end_date].sort_index(ascending=False)
 
         return fin_report
     
