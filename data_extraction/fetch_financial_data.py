@@ -18,11 +18,15 @@ class FundamentalDataLoader(DataLoader):
     def __init__(self):
         super().__init__()
         self.fd = FundamentalData(self.premium_api_key)
-        self.compressed_financial_reports_path = os.getenv(
-            "QFT_COMPRESSED_FINANCIAL_REPORTS_PATH")
-        self.gz_file_path = None
-        # Define a mapping of report types to their corresponding function calls
         
+        self.compressed_financial_reports_path = os.getenv(
+            "FIN_DATA_COMPRESSED_FINANCIAL_REPORTS_PATH")
+        self.compressed_company_overview_path = os.getenv(
+            "FIN_DATA_COMPRESSED_COMPANY_OVERVIEW_PATH")
+        
+        self.compressed_report_file_path = None
+        
+        # Define a mapping of report types to their corresponding function calls
         self.report_function_mapping = {
             'income_statement': {
                 'annual': self.fd.get_income_statement_annual,
@@ -38,7 +42,7 @@ class FundamentalDataLoader(DataLoader):
             }
         }
 
-    def get_company_overview(self, ticker):
+    def get_company_overview(self, ticker, local=True):
         """
         Get the company overview data for the given ticker.
 
@@ -48,9 +52,16 @@ class FundamentalDataLoader(DataLoader):
         Returns:
             dict: Dictionary containing the company overview data.
         """
-        data, meta_data = self.fd.get_company_overview(symbol=ticker)
-        data_df = pd.DataFrame.from_dict(data, orient='index')
-        return data_df
+        compressed_company_overview_file_path = os.path.join(
+            self.compressed_company_overview_path, f'{ticker}.gz')
+        if local and os.path.exists(compressed_company_overview_file_path):
+            data = pd.read_csv(compressed_company_overview_file_path, index_col=0)
+            return data
+        else:
+            data, meta_data = self.fd.get_company_overview(symbol=ticker)
+            data_df = pd.DataFrame.from_dict(data, orient='index')
+            data_df.to_csv(compressed_company_overview_file_path, index=True, compression='gzip')
+            return data_df
 
     def load_financial_reports(self, ticker, time_period, report_type, begin_date='2020-01-01', end_date='2021-01-01'):
         """
@@ -66,27 +77,29 @@ class FundamentalDataLoader(DataLoader):
             DataFrame: Pandas DataFrame containing the financial report data.
         """
 
-        self.gz_file_path = os.path.join(
+        self.compressed_report_file_path = os.path.join(
             self.compressed_financial_reports_path, f'{ticker}_{time_period}_{report_type}.gz')
 
-        if not os.path.exists(self.gz_file_path):
+        if not os.path.exists(self.compressed_report_file_path):
             self.init_financial_reports(ticker, time_period, report_type)
 
         fin_report = pd.read_csv(
-            self.gz_file_path, index_col='fiscalDateEnding', parse_dates=True)
+            self.compressed_report_file_path, index_col='fiscalDateEnding', parse_dates=True)
 
         last_date = fin_report.index.max()
-        today_date = pd.Timestamp.now()
-        date_diff = (today_date - last_date).days
-        if (time_period == 'annual' and date_diff > 365) or (time_period == 'quarterly' and date_diff > 91):
-            self.update_financial_reports(ticker, time_period, report_type)
-            # print(f'Updated {ticker} {time_period} {report_type} data.')
-            fin_report = pd.read_csv(
-                self.gz_file_path, index_col='fiscalDateEnding', parse_dates=True)
+        if pd.Timestamp(end_date) > last_date:
+            today_date = pd.Timestamp.now()
+            date_diff = (today_date - last_date).days
+            if (time_period == 'annual' and date_diff > 365) or (time_period == 'quarterly' and date_diff > 94):
+                # self.update_financial_reports(ticker, time_period, report_type)
+                # print(f'Updated {ticker} {time_period} {report_type} data.')
+                fin_report = pd.read_csv(
+                    self.compressed_report_file_path, index_col='fiscalDateEnding', parse_dates=True)
 
         fin_report = fin_report.sort_index(
         ).loc[begin_date:end_date].sort_index(ascending=False)
-
+        
+        fin_report = fin_report[~fin_report.index.duplicated(keep='first')]
         return fin_report
 
     def init_financial_reports(self, ticker, time_period, report_type):
@@ -107,9 +120,9 @@ class FundamentalDataLoader(DataLoader):
             raise ValueError(
                 f"Invalid report type '{report_type}' or time period '{time_period}'")
 
-        data.to_csv(self.gz_file_path, index=False, compression='gzip')
+        data.to_csv(self.compressed_report_file_path, index=False, compression='gzip')
 
-        print(f'Data saved to {self.gz_file_path}')
+        print(f'Data saved to {self.compressed_report_file_path}')
 
     def update_financial_reports(self, ticker, time_period, report_type):
         """
@@ -120,7 +133,7 @@ class FundamentalDataLoader(DataLoader):
             report_type (str): Type of financial report to load.
         """
 
-        curr_fin_report_df = pd.read_csv(self.gz_file_path,
+        curr_fin_report_df = pd.read_csv(self.compressed_report_file_path,
                                          index_col='fiscalDateEnding', parse_dates=True)
 
         # Get the latest date in the existing data
@@ -151,11 +164,11 @@ class FundamentalDataLoader(DataLoader):
                 [new_data_to_add, curr_fin_report_df])
             # Save the updated dataframe back to the CSV file
             curr_fin_report_df.to_csv(
-                self.gz_file_path, index=False, compression='gzip')
+                self.compressed_report_file_path, index=False, compression='gzip')
             print(f"Data for {ticker} has been updated.")
         else:
             print(
-                f"No new data available for {ticker} {time_period} {report_type}.")
+                f"No new data available for {ticker} {time_period} {report_type}. Last date: {last_date}")
 
 
 class StockDataLoader(DataLoader):
@@ -168,7 +181,7 @@ class DailyStockDataLoader(StockDataLoader):
     def __init__(self):
         super().__init__()
         self.compressed_daily_stock_path = os.getenv(
-            "QFT_COMPRESSED_DAILY_STOCK_PATH")
+            "FIN_DATA_COMPRESSED_DAILY_STOCK_PATH")
         self.gz_file_path = None
 
     def load_daily_stock_data(self, ticker, begin_date='2020-01-01', end_date='2021-01-01'):
