@@ -5,6 +5,7 @@ import pandas as pd
 import os
 from dotenv import load_dotenv
 import pandas_market_calendars as mcal
+import requests
 
 
 class DataLoader:
@@ -12,6 +13,14 @@ class DataLoader:
         load_dotenv()
         self.premium_api_key = os.getenv("ALPHA_VANTAGE_KEY")
         self.now = pd.Timestamp.now(tz='America/New_York')
+        self.av_url = 'https://www.alphavantage.co/query'
+        
+    def get_earnings(self, ticker):
+        url = (
+            f'{self.av_url}?function=EARNINGS&symbol={ticker}&apikey={self.premium_api_key}')
+        response = requests.get(url)
+        data = response.json()
+        return data
 
 
 class FundamentalDataLoader(DataLoader):
@@ -23,6 +32,10 @@ class FundamentalDataLoader(DataLoader):
             "FIN_DATA_COMPRESSED_FINANCIAL_REPORTS_PATH")
         self.compressed_company_overview_path = os.getenv(
             "FIN_DATA_COMPRESSED_COMPANY_OVERVIEW_PATH")
+        self.compressed_company_eaernings_path = os.getenv(
+            "FIN_DATA_COMPRESSED_COMPANY_EARNINGS_PATH")
+        self.compressed_company_news_path = os.getenv(
+            "FIN_DATA_COMPRESSED_COMPANY_NEWS_PATH")
         
         self.compressed_report_file_path = None
         
@@ -42,7 +55,7 @@ class FundamentalDataLoader(DataLoader):
             }
         }
 
-    def get_company_overview(self, ticker, local=True):
+    def load_company_overview(self, ticker, update=False):
         """
         Get the company overview data for the given ticker.
 
@@ -54,7 +67,7 @@ class FundamentalDataLoader(DataLoader):
         """
         compressed_company_overview_file_path = os.path.join(
             self.compressed_company_overview_path, f'{ticker}.gz')
-        if local and os.path.exists(compressed_company_overview_file_path):
+        if not update and os.path.exists(compressed_company_overview_file_path):
             data = pd.read_csv(compressed_company_overview_file_path, index_col=0)
             return data
         else:
@@ -62,6 +75,37 @@ class FundamentalDataLoader(DataLoader):
             data_df = pd.DataFrame.from_dict(data, orient='index')
             data_df.to_csv(compressed_company_overview_file_path, index=True, compression='gzip')
             return data_df
+        
+    def load_company_earnings(self, ticker, time_period='quarterly', update=False):
+        compressed_company_earnings_file_path = os.path.join(
+            self.compressed_company_eaernings_path, f'{ticker}_{time_period}_earnings.gz')
+        if not update and os.path.exists(compressed_company_earnings_file_path):
+            data = pd.read_csv(
+                compressed_company_earnings_file_path, index_col='fiscalDateEnding', parse_dates=True)
+            return data
+        else:
+            data = self.get_earnings(ticker)
+            quart_df = pd.DataFrame(data['quarterlyEarnings'])
+            quart_df.set_index('fiscalDateEnding', inplace=True)
+            quart_df.index = pd.to_datetime(quart_df.index)
+            quart_path = os.path.join(
+                self.compressed_company_eaernings_path, f'{ticker}_quarterly_earnings.gz')
+            quart_df.to_csv(quart_path, index=True, compression='gzip')
+            
+            annual_df = pd.DataFrame(data['annualEarnings'])
+            annual_df.set_index('fiscalDateEnding', inplace=True)
+            annual_df.index = pd.to_datetime(annual_df.index)
+            annual_path = os.path.join(
+                self.compressed_company_eaernings_path, f'{ticker}_annual_earnings.gz')
+            annual_df.to_csv(annual_path, index=True, compression='gzip')
+            
+            if 'quarterly' in time_period:
+                return quart_df
+            elif 'annual' in time_period:
+                return annual_df
+        
+    def get_company_news(self, ticker, update=False):
+        pass
 
     def load_financial_reports(self, ticker, time_period, report_type, begin_date='2020-01-01', end_date='2021-01-01'):
         """
@@ -87,6 +131,7 @@ class FundamentalDataLoader(DataLoader):
             self.compressed_report_file_path, index_col='fiscalDateEnding', parse_dates=True)
 
         last_date = fin_report.index.max()
+        # TODO: Use earning function to update the data
         if pd.Timestamp(end_date) > last_date:
             today_date = pd.Timestamp.now()
             date_diff = (today_date - last_date).days
