@@ -181,6 +181,10 @@ class FundamentalDataLoader(DataLoader):
             rounded_index = index + pd.offsets.MonthEnd(0)
             if rounded_index in earnings.index:
                 report.loc[index, earnings.columns] = earnings.loc[rounded_index].values
+            else:
+                rounded_index = index + pd.offsets.MonthEnd(-1)
+                if rounded_index in earnings.index:
+                    report.loc[index, earnings.columns] = earnings.loc[rounded_index].values
 
         report.to_csv(self.compressed_report_file_path, index=True, compression='gzip')
 
@@ -361,4 +365,4 @@ class DailyStockDataLoader(StockDataLoader):
 class IntradayStockDataLoader(StockDataLoader):
     def __init__(self):
         super().__init__()
-        self.intraday_stock_path = os.getenv("ROW_INTRADAY_STOCK_PATH")
+        self.intraday_stock_path = os.getenv("RAW_INTRADAY_STOCK_PATH")
