@@ -130,19 +130,22 @@ class FundamentalDataLoader(DataLoader):
         fin_report = pd.read_csv(
             self.compressed_report_file_path, index_col='fiscalDateEnding', parse_dates=True)
 
-        last_date = fin_report.index.max()
-        # TODO: Use earning function to update the data
+        if time_period == 'quarterly':
+            fin_report['reportedDate'] = pd.to_datetime(fin_report['reportedDate'])
+            last_date = fin_report['reportedDate'].max()
+        elif time_period == 'annual':
+            last_date = fin_report.index.max()
+            
         if pd.Timestamp(end_date) > last_date:
             today_date = pd.Timestamp.now()
             date_diff = (today_date - last_date).days
             if (time_period == 'annual' and date_diff > 365) or (time_period == 'quarterly' and date_diff > 94):
-                # self.update_financial_reports(ticker, time_period, report_type)
+                self.update_financial_reports(ticker, time_period, report_type)
                 # print(f'Updated {ticker} {time_period} {report_type} data.')
                 fin_report = pd.read_csv(
                     self.compressed_report_file_path, index_col='fiscalDateEnding', parse_dates=True)
 
-        fin_report = fin_report.sort_index(
-        ).loc[begin_date:end_date].sort_index(ascending=False)
+        fin_report = fin_report.sort_index().loc[begin_date:end_date].sort_index(ascending=False)
         
         fin_report = fin_report[~fin_report.index.duplicated(keep='first')]
         return fin_report
@@ -160,12 +163,26 @@ class FundamentalDataLoader(DataLoader):
             report_type, {}).get(time_period)
 
         if data_function:
-            data, _ = data_function(ticker)
+            report, _ = data_function(ticker)
         else:
             raise ValueError(
                 f"Invalid report type '{report_type}' or time period '{time_period}'")
+            
+        earnings = self.load_company_earnings(ticker, time_period)
+        
+        report.set_index('fiscalDateEnding', inplace=True)
+        report.index = pd.to_datetime(report.index)
+        
+        for col in earnings.columns:
+            if col not in report.columns:
+                report[col] = None
+        
+        for index, row in report.iterrows():
+            rounded_index = index + pd.offsets.MonthEnd(0)
+            if rounded_index in earnings.index:
+                report.loc[index, earnings.columns] = earnings.loc[rounded_index].values
 
-        data.to_csv(self.compressed_report_file_path, index=False, compression='gzip')
+        report.to_csv(self.compressed_report_file_path, index=True, compression='gzip')
 
         print(f'Data saved to {self.compressed_report_file_path}')
 
