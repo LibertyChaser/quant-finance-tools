@@ -140,7 +140,7 @@ class FundamentalDataLoader(DataLoader):
             today_date = pd.Timestamp.now()
             date_diff = (today_date - last_date).days
             if (time_period == 'annual' and date_diff > 365) or (time_period == 'quarterly' and date_diff > 94):
-                self.update_financial_reports(ticker, time_period, report_type)
+                # self.update_financial_reports(ticker, time_period, report_type)
                 # print(f'Updated {ticker} {time_period} {report_type} data.')
                 fin_report = pd.read_csv(
                     self.compressed_report_file_path, index_col='fiscalDateEnding', parse_dates=True)
@@ -148,6 +148,7 @@ class FundamentalDataLoader(DataLoader):
         fin_report = fin_report.sort_index().loc[begin_date:end_date].sort_index(ascending=False)
         
         fin_report = fin_report[~fin_report.index.duplicated(keep='first')]
+        fin_report['reportedDate'] = pd.to_datetime(fin_report['reportedDate'])
         return fin_report
 
     def init_financial_reports(self, ticker, time_period, report_type):
@@ -198,7 +199,7 @@ class FundamentalDataLoader(DataLoader):
             ticker (str): Stock ticker symbol.
             report_type (str): Type of financial report to load.
         """
-
+        # TODO: Update the function with update of earnings
         curr_fin_report_df = pd.read_csv(self.compressed_report_file_path,
                                          index_col='fiscalDateEnding', parse_dates=True)
 
